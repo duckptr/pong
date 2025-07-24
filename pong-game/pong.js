@@ -17,6 +17,12 @@ let ballY = canvas.height / 2;
 let ballSpeedX = 6;
 let ballSpeedY = 4;
 
+// Second ball (used when 3-point difference occurs)
+let ball2X = canvas.width / 2;
+let ball2Y = canvas.height / 2;
+let ball2SpeedX = 6;
+let ball2SpeedY = 4;
+
 // Scores
 let leftScore = 0;
 let rightScore = 0;
@@ -24,14 +30,19 @@ let rightScore = 0;
 // Game state
 let gameOver = false;
 
+// Paddle scaling factors
+let leftPaddleHeight = paddleHeight;
+let rightPaddleHeight = paddleHeight;
+
 // Mouse controls
 canvas.addEventListener('mousemove', function(e) {
     const rect = canvas.getBoundingClientRect();
     const mouseY = e.clientY - rect.top;
-    leftPaddleY = mouseY - paddleHeight / 2;
+    leftPaddleY = mouseY - leftPaddleHeight / 2;
     // Clamp paddle within canvas
     if (leftPaddleY < 0) leftPaddleY = 0;
-    if (leftPaddleY > canvas.height - paddleHeight) leftPaddleY = canvas.height - paddleHeight;
+    if (leftPaddleY > canvas.height - leftPaddleHeight)
+        leftPaddleY = canvas.height - leftPaddleHeight;
 });
 
 // Draw everything
@@ -47,17 +58,26 @@ function draw() {
 
     // Draw paddles
     ctx.fillStyle = "#0f0";
-    ctx.fillRect(0, leftPaddleY, paddleWidth, paddleHeight);
+    ctx.fillRect(0, leftPaddleY, paddleWidth, leftPaddleHeight);
 
     ctx.fillStyle = "#f00";
-    ctx.fillRect(canvas.width - paddleWidth, rightPaddleY, paddleWidth, paddleHeight);
+    ctx.fillRect(canvas.width - paddleWidth, rightPaddleY, paddleWidth, rightPaddleHeight);
 
-    // Draw ball
+    // Draw balls
     ctx.beginPath();
     ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
     ctx.fillStyle = "#fff";
     ctx.fill();
     ctx.closePath();
+
+    // If second ball exists, draw it
+    if (Math.abs(leftScore - rightScore) >= 3) {
+        ctx.beginPath();
+        ctx.arc(ball2X, ball2Y, ballRadius, 0, Math.PI * 2);
+        ctx.fillStyle = "#ff0";  // Different color for second ball
+        ctx.fill();
+        ctx.closePath();
+    }
 
     // Draw scores
     ctx.font = "40px Arial";
@@ -81,7 +101,13 @@ function update() {
     ballX += ballSpeedX;
     ballY += ballSpeedY;
 
-    // Top/bottom wall collision
+    // Ball2 movement (when second ball exists)
+    if (Math.abs(leftScore - rightScore) >= 3) {
+        ball2X += ball2SpeedX;
+        ball2Y += ball2SpeedY;
+    }
+
+    // Top/bottom wall collision for both balls
     if (ballY - ballRadius < 0) {
         ballY = ballRadius;
         ballSpeedY = -ballSpeedY;
@@ -91,15 +117,27 @@ function update() {
         ballSpeedY = -ballSpeedY;
     }
 
+    // Second ball collision with top/bottom
+    if (Math.abs(leftScore - rightScore) >= 3) {
+        if (ball2Y - ballRadius < 0) {
+            ball2Y = ballRadius;
+            ball2SpeedY = -ball2SpeedY;
+        }
+        if (ball2Y + ballRadius > canvas.height) {
+            ball2Y = canvas.height - ballRadius;
+            ball2SpeedY = -ball2SpeedY;
+        }
+    }
+
     // Left paddle collision
     if (
         ballX - ballRadius < paddleWidth &&
         ballY > leftPaddleY &&
-        ballY < leftPaddleY + paddleHeight
+        ballY < leftPaddleY + leftPaddleHeight
     ) {
         ballX = paddleWidth + ballRadius;
         ballSpeedX = -ballSpeedX;
-        let collidePoint = (ballY - (leftPaddleY + paddleHeight / 2)) / (paddleHeight / 2);
+        let collidePoint = (ballY - (leftPaddleY + leftPaddleHeight / 2)) / (leftPaddleHeight / 2);
         ballSpeedY = collidePoint * 5;
     }
 
@@ -107,12 +145,24 @@ function update() {
     if (
         ballX + ballRadius > canvas.width - paddleWidth &&
         ballY > rightPaddleY &&
-        ballY < rightPaddleY + paddleHeight
+        ballY < rightPaddleY + rightPaddleHeight
     ) {
         ballX = canvas.width - paddleWidth - ballRadius;
         ballSpeedX = -ballSpeedX;
-        let collidePoint = (ballY - (rightPaddleY + paddleHeight / 2)) / (paddleHeight / 2);
+        let collidePoint = (ballY - (rightPaddleY + rightPaddleHeight / 2)) / (rightPaddleHeight / 2);
         ballSpeedY = collidePoint * 5;
+    }
+
+    // Second ball collision with right paddle (AI)
+    if (
+        ball2X + ballRadius > canvas.width - paddleWidth &&
+        ball2Y > rightPaddleY &&
+        ball2Y < rightPaddleY + rightPaddleHeight
+    ) {
+        ball2X = canvas.width - paddleWidth - ballRadius;
+        ball2SpeedX = -ball2SpeedX;
+        let collidePoint = (ball2Y - (rightPaddleY + rightPaddleHeight / 2)) / (rightPaddleHeight / 2);
+        ball2SpeedY = collidePoint * 5;
     }
 
     // Left/right wall (reset ball to center)
@@ -127,8 +177,33 @@ function update() {
         resetBall();
     }
 
+    // Second ball left/right wall
+    if (ball2X - ballRadius < 0) {
+        rightScore++;
+        if (rightScore >= 10) gameOver = true;
+        resetBall2();
+    }
+    if (ball2X + ballRadius > canvas.width) {
+        leftScore++;
+        if (leftScore >= 10) gameOver = true;
+        resetBall2();
+    }
+
+    // Scale paddles based on score difference
+    if (Math.abs(leftScore - rightScore) >= 3) {
+        if (leftScore < rightScore) {
+            leftPaddleHeight = paddleHeight * 1.5; // Make left paddle taller if behind
+        } else {
+            rightPaddleHeight = paddleHeight * 1.5; // Make right paddle taller if behind
+        }
+    } else {
+        // Reset paddle height when the score difference is less than 3
+        leftPaddleHeight = paddleHeight;
+        rightPaddleHeight = paddleHeight;
+    }
+
     // AI paddle movement
-    let center = rightPaddleY + paddleHeight / 2;
+    let center = rightPaddleY + rightPaddleHeight / 2;
     if (center < ballY - 15) {
         rightPaddleY += aiSpeed;
     } else if (center > ballY + 15) {
@@ -136,16 +211,22 @@ function update() {
     }
     // Clamp AI paddle
     if (rightPaddleY < 0) rightPaddleY = 0;
-    if (rightPaddleY > canvas.height - paddleHeight)
-        rightPaddleY = canvas.height - paddleHeight;
+    if (rightPaddleY > canvas.height - rightPaddleHeight)
+        rightPaddleY = canvas.height - rightPaddleHeight;
 }
 
 function resetBall() {
     ballX = canvas.width / 2;
     ballY = canvas.height / 2;
-    // Randomize direction
     ballSpeedX = (Math.random() > 0.5 ? 1 : -1) * 6;
     ballSpeedY = (Math.random() * 2 - 1) * 5;
+}
+
+function resetBall2() {
+    ball2X = canvas.width / 2;
+    ball2Y = canvas.height / 2;
+    ball2SpeedX = (Math.random() > 0.5 ? 1 : -1) * 6;
+    ball2SpeedY = (Math.random() * 2 - 1) * 5;
 }
 
 // Restart the game if 'R' key is pressed
