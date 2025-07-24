@@ -17,9 +17,12 @@ let ballY = canvas.height / 2;
 let ballSpeedX = 6;
 let ballSpeedY = 4;
 
-// Scores (optional, for extension)
+// Scores
 let leftScore = 0;
 let rightScore = 0;
+
+// Game state
+let gameOver = false;
 
 // Mouse controls
 canvas.addEventListener('mousemove', function(e) {
@@ -28,8 +31,7 @@ canvas.addEventListener('mousemove', function(e) {
     leftPaddleY = mouseY - paddleHeight / 2;
     // Clamp paddle within canvas
     if (leftPaddleY < 0) leftPaddleY = 0;
-    if (leftPaddleY > canvas.height - paddleHeight)
-        leftPaddleY = canvas.height - paddleHeight;
+    if (leftPaddleY > canvas.height - paddleHeight) leftPaddleY = canvas.height - paddleHeight;
 });
 
 // Draw everything
@@ -57,16 +59,24 @@ function draw() {
     ctx.fill();
     ctx.closePath();
 
-    // Draw scores (optional)
-    /*
+    // Draw scores
     ctx.font = "40px Arial";
     ctx.fillText(leftScore, canvas.width / 4, 50);
     ctx.fillText(rightScore, 3 * canvas.width / 4, 50);
-    */
+
+    // Check if game is over
+    if (gameOver) {
+        ctx.fillStyle = "#fff";
+        ctx.font = "30px Arial";
+        ctx.fillText(leftScore === 10 ? "Left Player Wins!" : "Right Player Wins!", canvas.width / 4, canvas.height / 2);
+        ctx.fillText("Press 'R' to Restart", canvas.width / 4, canvas.height / 2 + 40);
+    }
 }
 
 // Ball and paddle movement logic
 function update() {
+    if (gameOver) return; // Stop updating when game is over
+
     // Ball movement
     ballX += ballSpeedX;
     ballY += ballSpeedY;
@@ -89,7 +99,6 @@ function update() {
     ) {
         ballX = paddleWidth + ballRadius;
         ballSpeedX = -ballSpeedX;
-        // Add variation based on where it hits the paddle
         let collidePoint = (ballY - (leftPaddleY + paddleHeight / 2)) / (paddleHeight / 2);
         ballSpeedY = collidePoint * 5;
     }
@@ -109,10 +118,12 @@ function update() {
     // Left/right wall (reset ball to center)
     if (ballX - ballRadius < 0) {
         rightScore++;
+        if (rightScore >= 10) gameOver = true;
         resetBall();
     }
     if (ballX + ballRadius > canvas.width) {
         leftScore++;
+        if (leftScore >= 10) gameOver = true;
         resetBall();
     }
 
@@ -136,6 +147,17 @@ function resetBall() {
     ballSpeedX = (Math.random() > 0.5 ? 1 : -1) * 6;
     ballSpeedY = (Math.random() * 2 - 1) * 5;
 }
+
+// Restart the game if 'R' key is pressed
+document.addEventListener('keydown', function(e) {
+    if (gameOver && e.key === 'r') {
+        // Reset scores and game state
+        leftScore = 0;
+        rightScore = 0;
+        gameOver = false;
+        resetBall();
+    }
+});
 
 // Main game loop
 function gameLoop() {
